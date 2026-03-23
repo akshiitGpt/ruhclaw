@@ -21,10 +21,18 @@ export type ContentBlock =
 export interface Message {
   id: string;
   role: "user" | "assistant";
-  content: string; // plain text for user messages
-  blocks: ContentBlock[]; // ordered blocks for assistant
+  content: string;
+  blocks: ContentBlock[];
   timestamp: number;
   streaming?: boolean;
+}
+
+export interface FileNode {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+  children?: FileNode[];
+  status?: "new" | "modified";
 }
 
 export type WSIncoming =
@@ -32,6 +40,7 @@ export type WSIncoming =
   | { type: "tool_call_start"; id: string; name: string; arguments: string }
   | { type: "tool_call_update"; id: string; output: string }
   | { type: "tool_call_result"; id: string; output: string; isError: boolean }
+  | { type: "file_change"; event: "create" | "modify" | "delete"; path: string; ts: number }
   | { type: "done" }
   | { type: "error"; message: string };
 

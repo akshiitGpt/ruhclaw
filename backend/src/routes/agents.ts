@@ -1,6 +1,7 @@
 import { Elysia, t } from "elysia";
 import { createContainer } from "../services/docker";
 import { OpenClawClient } from "../services/openclaw-ws";
+import { FileWatcherClient } from "../services/file-watcher";
 
 interface AgentRecord {
   id: string;
@@ -10,15 +11,17 @@ interface AgentRecord {
   gatewayUrl: string;
   gatewayToken: string;
   openclawClient: OpenClawClient | null;
+  fileWatcher: FileWatcherClient | null;
   createdAt: string;
 }
 
-const agents = new Map<string, AgentRecord>();
+// Exported so file routes can access agent records
+export const agents = new Map<string, AgentRecord>();
 
 export const agentRoutes = new Elysia({ prefix: "/api/agents" })
   .get("/", () => {
     const list = Array.from(agents.values()).map(
-      ({ containerId, gatewayUrl, gatewayToken, openclawClient, ...rest }) => rest
+      ({ containerId, gatewayUrl, gatewayToken, openclawClient, fileWatcher, ...rest }) => rest
     );
     return { agents: list };
   })
@@ -33,23 +36,29 @@ export const agentRoutes = new Elysia({ prefix: "/api/agents" })
       gatewayUrl: "",
       gatewayToken: "",
       openclawClient: null,
+      fileWatcher: null,
       createdAt: new Date().toISOString(),
     };
     agents.set(id, record);
 
-    // Create container + connect WS asynchronously
     (async () => {
       const info = await createContainer();
       record.containerId = info.containerId;
       record.gatewayUrl = info.gatewayUrl;
       record.gatewayToken = info.gatewayToken;
 
-      // Connect WebSocket to gateway via loopback proxy
+      // Connect OpenClaw WebSocket
       const client = new OpenClawClient(info.gatewayUrl, info.gatewayToken);
       await client.connect();
       record.openclawClient = client;
+
+      // Connect file watcher
+      const watcher = new FileWatcherClient(info.fileWatcherPort);
+      await watcher.connect();
+      record.fileWatcher = watcher;
+
       record.status = "running";
-      console.log(`[agents] Agent ${id} ready (WS connected to ${info.gatewayUrl})`);
+      console.log(`[agents] Agent ${id} ready (gateway + file watcher connected)`);
     })().catch((err) => {
       console.error(`[agents] Agent ${id} failed:`, err);
       record.status = "error";
@@ -68,7 +77,7 @@ export const agentRoutes = new Elysia({ prefix: "/api/agents" })
     async ({ params }) => {
       const agent = agents.get(params.id);
       if (!agent) throw new Error("Agent not found");
-      const { containerId, gatewayUrl, gatewayToken, openclawClient, ...rest } = agent;
+      const { containerId, gatewayUrl, gatewayToken, openclawClient, fileWatcher, ...rest } = agent;
       return rest;
     },
     { params: t.Object({ id: t.String() }) }
@@ -83,7 +92,19 @@ export function setupChatWebSocket(app: any) {
     }),
 
     open(ws: any) {
-      console.log(`[ws] Connected: ${ws.data.params.agentId}`);
+      const agentId = ws.data.params.agentId;
+      const agent = agents.get(agentId);
+      console.log(`[ws] Connected: ${agentId}`);
+
+      // Register file watcher listener for this WS client
+      if (agent?.fileWatcher) {
+        const listener = (evt: any) => {
+          ws.send(JSON.stringify({ type: "file_change", ...evt }));
+        };
+        agent.fileWatcher.addListener(listener);
+        // Store listener ref for cleanup
+        (ws as any)._fileWatcherListener = listener;
+      }
     },
 
     async message(ws: any, body: any) {
@@ -141,7 +162,14 @@ export function setupChatWebSocket(app: any) {
     },
 
     close(ws: any) {
-      console.log(`[ws] Disconnected: ${ws.data.params.agentId}`);
+      const agentId = ws.data.params.agentId;
+      const agent = agents.get(agentId);
+      console.log(`[ws] Disconnected: ${agentId}`);
+
+      // Cleanup file watcher listener
+      if (agent?.fileWatcher && (ws as any)._fileWatcherListener) {
+        agent.fileWatcher.removeListener((ws as any)._fileWatcherListener);
+      }
     },
   });
 }

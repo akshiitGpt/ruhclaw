@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Message, ContentBlock, WSIncoming } from "@/types";
 import { chatWsUrl, getAgent } from "@/lib/api";
 
-export function useChat(agentId: string | undefined) {
+export function useChat(agentId: string | undefined, onRawEvent?: (data: WSIncoming) => void) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [connected, setConnected] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -38,6 +38,9 @@ export function useChat(agentId: string | undefined) {
 
       ws.onmessage = (evt) => {
         const data: WSIncoming = JSON.parse(evt.data);
+
+        // Forward all events to external listeners (file explorer, etc.)
+        onRawEvent?.(data);
 
         if (data.type === "chunk") {
           setIsTyping(true);

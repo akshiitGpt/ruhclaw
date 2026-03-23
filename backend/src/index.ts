@@ -2,6 +2,7 @@ import { Elysia } from "elysia";
 import { swagger } from "@elysiajs/swagger";
 import { cors } from "@elysiajs/cors";
 import { agentRoutes, setupChatWebSocket } from "./routes/agents";
+import { fileRoutes } from "./routes/files";
 
 const app = new Elysia()
   .use(
@@ -16,14 +17,15 @@ const app = new Elysia()
           title: "ruhclaw API",
           version: "1.0.0",
           description:
-            "API for creating AI agent sandboxes powered by Daytona & OpenClaw",
+            "API for creating AI agent sandboxes powered by OpenClaw",
         },
         tags: [{ name: "Agents", description: "Agent lifecycle management" }],
       },
       path: "/docs",
     }),
   )
-  .use(agentRoutes);
+  .use(agentRoutes)
+  .use(fileRoutes);
 
 // Register WebSocket handler
 setupChatWebSocket(app);

@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { ArrowUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 interface ChatInputProps {
   onSend: (content: string) => void;
@@ -9,56 +8,44 @@ interface ChatInputProps {
 
 export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [value, setValue] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height =
-        Math.min(textareaRef.current.scrollHeight, 160) + "px";
+    if (ref.current) {
+      ref.current.style.height = "auto";
+      ref.current.style.height = Math.min(ref.current.scrollHeight, 150) + "px";
     }
   }, [value]);
 
-  const handleSubmit = () => {
-    const trimmed = value.trim();
-    if (!trimmed || disabled) return;
-    onSend(trimmed);
+  const submit = () => {
+    const t = value.trim();
+    if (!t || disabled) return;
+    onSend(t);
     setValue("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    if (ref.current) ref.current.style.height = "auto";
   };
 
   return (
-    <div className="border-t border-border/60 bg-background px-4 pb-5 pt-3">
-      <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border/80 bg-muted/30 px-4 py-2.5 transition-colors focus-within:border-foreground/20 focus-within:bg-muted/50">
+    <div className="border-t border-border/30 px-4 pb-4 pt-2.5">
+      <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-xl border border-border/50 bg-white px-3.5 py-2 shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all focus-within:border-foreground/15 focus-within:shadow-[0_1px_8px_rgba(0,0,0,0.06)]">
         <textarea
-          ref={textareaRef}
+          ref={ref}
           rows={1}
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSubmit();
-            }
-          }}
-          placeholder="Send a message..."
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
+          placeholder="Message the agent..."
           disabled={disabled}
-          className="min-h-[24px] max-h-[160px] flex-1 resize-none bg-transparent text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 disabled:cursor-not-allowed disabled:opacity-50"
+          className="min-h-[22px] max-h-[150px] flex-1 resize-none bg-transparent text-[13.5px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/35 disabled:cursor-not-allowed disabled:opacity-40"
         />
-        <Button
-          size="icon-sm"
-          onClick={handleSubmit}
+        <button
+          onClick={submit}
           disabled={!value.trim() || disabled}
-          className="shrink-0 rounded-lg transition-transform active:scale-95"
+          className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-foreground text-background transition-all hover:bg-foreground/85 active:scale-95 disabled:opacity-20 disabled:hover:bg-foreground"
         >
-          <ArrowUp className="size-4" />
-        </Button>
+          <ArrowUp className="size-3.5" strokeWidth={2.5} />
+        </button>
       </div>
-      <p className="mt-2 text-center text-[11px] text-muted-foreground/50">
-        ruhclaw may produce inaccurate responses
-      </p>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { Agent } from "@/types";
+import type { Agent, FileNode } from "@/types";
 
 const BASE = "/api";
 
@@ -24,4 +24,18 @@ export async function getAgent(id: string): Promise<Agent> {
 export function chatWsUrl(agentId: string): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${proto}//${window.location.host}/ws/chat/${agentId}`;
+}
+
+export async function getFileTree(agentId: string): Promise<FileNode[]> {
+  const res = await fetch(`${BASE}/agents/${agentId}/files`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.tree ?? [];
+}
+
+export async function getFileContent(agentId: string, path: string): Promise<string> {
+  const res = await fetch(`${BASE}/agents/${agentId}/file?path=${encodeURIComponent(path)}`);
+  if (!res.ok) return "";
+  const data = await res.json();
+  return data.content ?? "";
 }

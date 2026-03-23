@@ -1,127 +1,84 @@
 import { useState } from "react";
 import {
-  Terminal,
-  FileText,
-  Pencil,
-  Eye,
-  Globe,
-  Search,
-  ChevronDown,
-  Check,
-  Loader2,
-  AlertCircle,
+  Terminal, FileText, Pencil, Eye, Globe, Search,
+  ChevronRight, Check, Loader2, AlertCircle, GitBranch,
 } from "lucide-react";
 import type { ToolCall } from "@/types";
 
-const TOOL_META: Record<string, { icon: typeof Terminal; label: string; color: string }> = {
-  exec: { icon: Terminal, label: "Ran command", color: "text-orange-600" },
-  write: { icon: FileText, label: "Created file", color: "text-blue-600" },
-  read: { icon: Eye, label: "Read file", color: "text-violet-600" },
-  edit: { icon: Pencil, label: "Edited file", color: "text-teal-600" },
-  apply_patch: { icon: Pencil, label: "Applied patch", color: "text-teal-600" },
-  web_search: { icon: Search, label: "Searched web", color: "text-pink-600" },
-  web_fetch: { icon: Globe, label: "Fetched URL", color: "text-cyan-600" },
-  browser: { icon: Globe, label: "Used browser", color: "text-cyan-600" },
-  message: { icon: FileText, label: "Sent message", color: "text-blue-600" },
+const META: Record<string, { icon: typeof Terminal; verb: string }> = {
+  exec: { icon: Terminal, verb: "Ran" },
+  write: { icon: FileText, verb: "Wrote" },
+  read: { icon: Eye, verb: "Read" },
+  edit: { icon: Pencil, verb: "Edited" },
+  apply_patch: { icon: Pencil, verb: "Patched" },
+  web_search: { icon: Search, verb: "Searched" },
+  web_fetch: { icon: Globe, verb: "Fetched" },
+  sessions_spawn: { icon: GitBranch, verb: "Spawned" },
+  sessions_yield: { icon: GitBranch, verb: "Yielded" },
 };
 
-function getMeta(name: string) {
-  return TOOL_META[name] || { icon: Terminal, label: name, color: "text-muted-foreground" };
-}
-
-function getPreview(tc: ToolCall): string {
+function describe(tc: ToolCall) {
+  const m = META[tc.name] || { icon: Terminal, verb: tc.name };
   try {
     const a = JSON.parse(tc.arguments);
-    if (tc.name === "exec") return a.command || "";
-    if (tc.name === "write" || tc.name === "read" || tc.name === "edit") return a.file_path || a.path || "";
-    if (tc.name === "web_search") return a.query || "";
-    if (tc.name === "web_fetch") return a.url || "";
-    return "";
-  } catch { return ""; }
+    if (tc.name === "exec") return { ...m, detail: a.command };
+    if (["write", "read", "edit"].includes(tc.name)) return { ...m, detail: a.file_path || a.path };
+    if (tc.name === "sessions_spawn") return { ...m, detail: a.label || a.task };
+    if (tc.name === "web_search") return { ...m, detail: a.query };
+    return m;
+  } catch { return m; }
 }
 
-function formatArgs(raw: string): string {
+function fmt(raw: string) {
   try { return JSON.stringify(JSON.parse(raw), null, 2); }
   catch { return raw || ""; }
 }
 
 export function ToolCallCard({ toolCall }: { toolCall: ToolCall }) {
-  const [expanded, setExpanded] = useState(false);
-  const meta = getMeta(toolCall.name);
-  const Icon = meta.icon;
-  const isCalling = toolCall.status === "calling";
-  const isError = toolCall.status === "error";
-  const preview = getPreview(toolCall);
-  const hasOutput = toolCall.output.length > 0;
-  const formattedArgs = formatArgs(toolCall.arguments);
+  const [open, setOpen] = useState(false);
+  const { icon: Icon, verb, detail } = describe(toolCall) as ReturnType<typeof describe> & { detail?: string };
+  const calling = toolCall.status === "calling";
+  const err = toolCall.status === "error";
 
   return (
-    <div className="tool-card-enter my-1.5 overflow-hidden rounded-xl border border-border/50 bg-background shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-      {/* Header — always visible */}
+    <div className="my-0.5 animate-fade-up">
       <button
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/30"
+        onClick={() => setOpen((v) => !v)}
+        className="group flex w-full items-center gap-1.5 py-0.5 text-left"
       >
-        {/* Status indicator */}
-        <div className={`flex size-[18px] shrink-0 items-center justify-center rounded-full ${
-          isCalling ? "bg-amber-50 ring-1 ring-amber-200" :
-          isError ? "bg-red-50 ring-1 ring-red-200" :
-          "bg-emerald-50 ring-1 ring-emerald-200"
+        <span className={`flex size-3.5 shrink-0 items-center justify-center rounded-full ${
+          calling ? "text-amber-500" : err ? "text-red-400" : "text-emerald-500"
         }`}>
-          {isCalling ? <Loader2 className="size-2.5 animate-spin text-amber-500" /> :
-           isError ? <AlertCircle className="size-2.5 text-red-500" /> :
-           <Check className="size-2.5 text-emerald-500" strokeWidth={3} />}
-        </div>
-
-        <Icon className={`size-3.5 ${meta.color} opacity-60`} />
-
-        <span className="flex-1 min-w-0 text-[12.5px]">
-          <span className="font-medium text-foreground/70">{meta.label}</span>
-          {preview && (
-            <span className="ml-1.5 font-mono text-[11.5px] text-muted-foreground/50 truncate">
-              {preview.length > 50 ? preview.slice(0, 50) + "…" : preview}
-            </span>
-          )}
+          {calling ? <Loader2 className="size-2.5 animate-spin" /> :
+           err ? <AlertCircle className="size-2.5" /> :
+           <Check className="size-2.5" strokeWidth={3} />}
         </span>
-
-        <ChevronDown className={`size-3 text-muted-foreground/30 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+        <Icon className="size-3 text-muted-foreground/30" />
+        <span className="flex-1 min-w-0 truncate text-[12px] text-muted-foreground/60">
+          {verb}
+          {detail && <code className="ml-1 text-[11px] text-foreground/40">{detail.length > 48 ? detail.slice(0, 48) + "..." : detail}</code>}
+        </span>
+        {(toolCall.arguments !== "{}" || toolCall.output) && (
+          <ChevronRight className={`size-2.5 text-muted-foreground/20 transition-transform duration-100 group-hover:text-muted-foreground/40 ${open ? "rotate-90" : ""}`} />
+        )}
       </button>
 
-      {/* Expanded details */}
-      {expanded && (
-        <div className="border-t border-border/30">
-          {/* Input */}
-          {formattedArgs && formattedArgs !== "{}" && (
-            <div className="px-3 py-2 bg-muted/[0.03]">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/30">
-                Input
-              </p>
-              <pre className="overflow-x-auto rounded-md bg-muted/30 px-2.5 py-1.5 text-[11px] leading-relaxed text-foreground/60 font-mono">
-                {formattedArgs}
-              </pre>
-            </div>
+      {open && (
+        <div className="ml-5 mt-0.5 mb-1.5 border-l border-border/30 pl-3 space-y-1.5 animate-fade-up">
+          {toolCall.arguments && toolCall.arguments !== "{}" && (
+            <pre className="overflow-x-auto rounded-md bg-muted/20 px-2.5 py-1.5 font-mono text-[10.5px] leading-relaxed text-foreground/40">
+              {fmt(toolCall.arguments)}
+            </pre>
           )}
-
-          {/* Output */}
-          {hasOutput && (
-            <div className="border-t border-border/20 px-3 py-2 bg-muted/[0.02]">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/30">
-                Output
-              </p>
-              <pre className="overflow-x-auto max-h-48 overflow-y-auto rounded-md bg-muted/30 px-2.5 py-1.5 text-[11px] leading-relaxed text-foreground/50 font-mono">
-                {toolCall.output.slice(0, 3000)}{toolCall.output.length > 3000 ? "\n…" : ""}
-              </pre>
-            </div>
+          {toolCall.output && (
+            <pre className="max-h-40 overflow-auto rounded-md bg-muted/20 px-2.5 py-1.5 font-mono text-[10.5px] leading-relaxed text-foreground/35">
+              {toolCall.output.slice(0, 4000)}{toolCall.output.length > 4000 ? "\n..." : ""}
+            </pre>
           )}
-
-          {/* Loading state for output */}
-          {isCalling && !hasOutput && (
-            <div className="border-t border-border/20 px-3 py-2.5">
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground/40">
-                <Loader2 className="size-3 animate-spin" />
-                Running...
-              </div>
-            </div>
+          {calling && !toolCall.output && (
+            <p className="flex items-center gap-1.5 py-0.5 font-mono text-[10.5px] text-muted-foreground/30">
+              <Loader2 className="size-2.5 animate-spin" /> running
+            </p>
           )}
         </div>
       )}

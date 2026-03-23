@@ -8,9 +8,10 @@ RUN npm install -g openclaw
 
 COPY entrypoint.sh /entrypoint.sh
 COPY ws-proxy.mjs /ws-proxy.mjs
+COPY file-watcher.mjs /file-watcher.mjs
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 18789 18790
+EXPOSE 18789 18790 18791
 
 ENV OPENCLAW_GATEWAY_PORT=18789
 ENV OPENCLAW_MODEL=anthropic/claude-sonnet-4
