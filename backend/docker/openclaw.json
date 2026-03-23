@@ -1,0 +1,58 @@
+{
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "openrouter": {
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "apiKey": { "source": "env", "provider": "default", "id": "OPENROUTER_API_KEY" },
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "anthropic/claude-sonnet-4",
+            "name": "claude-sonnet",
+            "contextWindow": 200000,
+            "maxTokens": 16000
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "/root/.openclaw/workspace",
+      "model": "openrouter/anthropic/claude-sonnet-4",
+      "verboseDefault": "full"
+    },
+    "list": [
+      {
+        "id": "main",
+        "default": true,
+        "name": "ruhclaw",
+        "workspace": "/root/.openclaw/workspace"
+      }
+    ]
+  },
+  "gateway": {
+    "mode": "local",
+    "port": 18789,
+    "bind": "loopback",
+    "auth": {
+      "mode": "none"
+    },
+    "controlUi": {
+      "enabled": false
+    },
+    "http": {
+      "endpoints": {
+        "chatCompletions": { "enabled": true },
+        "responses": { "enabled": true }
+      }
+    }
+  },
+  "session": {
+    "dmScope": "main"
+  },
+  "tools": {
+    "profile": "coding"
+  }
+}

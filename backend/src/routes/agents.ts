@@ -9,7 +9,6 @@ interface AgentRecord {
   status: "creating" | "running" | "stopped" | "error";
   containerId: string;
   gatewayUrl: string;
-  gatewayToken: string;
   previewPort: number;
   openclawClient: OpenClawClient | null;
   fileWatcher: FileWatcherClient | null;
@@ -21,7 +20,7 @@ export const agents = new Map<string, AgentRecord>();
 export const agentRoutes = new Elysia({ prefix: "/api/agents" })
   .get("/", () => {
     const list = Array.from(agents.values()).map(
-      ({ containerId, gatewayUrl, gatewayToken, openclawClient, fileWatcher, ...rest }) => rest
+      ({ containerId, gatewayUrl, openclawClient, fileWatcher, ...rest }) => rest
     );
     return { agents: list };
   })
@@ -34,7 +33,6 @@ export const agentRoutes = new Elysia({ prefix: "/api/agents" })
       status: "creating",
       containerId: "",
       gatewayUrl: "",
-      gatewayToken: "",
       previewPort: 0,
       openclawClient: null,
       fileWatcher: null,
@@ -46,10 +44,10 @@ export const agentRoutes = new Elysia({ prefix: "/api/agents" })
       const info = await createContainer();
       record.containerId = info.containerId;
       record.gatewayUrl = info.gatewayUrl;
-      record.gatewayToken = info.gatewayToken;
       record.previewPort = info.previewPort;
 
-      const client = new OpenClawClient(info.gatewayUrl, info.gatewayToken);
+      // No auth token needed — gateway runs with auth: "none"
+      const client = new OpenClawClient(info.gatewayUrl);
       await client.connect();
       record.openclawClient = client;
 
@@ -58,7 +56,7 @@ export const agentRoutes = new Elysia({ prefix: "/api/agents" })
       record.fileWatcher = watcher;
 
       record.status = "running";
-      console.log(`[agents] Agent ${id} ready (preview port: ${info.previewPort})`);
+      console.log(`[agents] Agent ${id} ready (preview: ${info.previewPort})`);
     })().catch((err) => {
       console.error(`[agents] Agent ${id} failed:`, err);
       record.status = "error";
@@ -67,36 +65,23 @@ export const agentRoutes = new Elysia({ prefix: "/api/agents" })
     return { id: record.id, status: record.status, name: record.name, createdAt: record.createdAt };
   })
 
-  .get(
-    "/:id",
-    async ({ params }) => {
-      const agent = agents.get(params.id);
-      if (!agent) throw new Error("Agent not found");
-      const { containerId, gatewayUrl, gatewayToken, openclawClient, fileWatcher, ...rest } = agent;
-      return rest;
-    },
-    { params: t.Object({ id: t.String() }) }
-  )
+  .get("/:id", async ({ params }) => {
+    const agent = agents.get(params.id);
+    if (!agent) throw new Error("Agent not found");
+    const { containerId, gatewayUrl, openclawClient, fileWatcher, ...rest } = agent;
+    return rest;
+  }, { params: t.Object({ id: t.String() }) })
 
-  // Set preview target port
-  .post(
-    "/:id/preview-target",
-    async ({ params, body }) => {
-      const agent = agents.get(params.id);
-      if (!agent || !agent.previewPort) throw new Error("Agent not found");
-
-      const res = await fetch(`http://localhost:${agent.previewPort}/__preview_target__`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ port: (body as any).port }),
-      });
-      return res.json();
-    },
-    {
-      params: t.Object({ id: t.String() }),
-      body: t.Object({ port: t.Number() }),
-    }
-  );
+  .post("/:id/preview-target", async ({ params, body }) => {
+    const agent = agents.get(params.id);
+    if (!agent || !agent.previewPort) throw new Error("Agent not found");
+    const res = await fetch(`http://localhost:${agent.previewPort}/__preview_target__`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ port: (body as any).port }),
+    });
+    return res.json();
+  }, { params: t.Object({ id: t.String() }), body: t.Object({ port: t.Number() }) });
 
 export function setupChatWebSocket(app: any) {
   return app.ws("/ws/chat/:agentId", {
@@ -104,14 +89,9 @@ export function setupChatWebSocket(app: any) {
     body: t.Object({ type: t.Literal("message"), content: t.String() }),
 
     open(ws: any) {
-      const agentId = ws.data.params.agentId;
-      const agent = agents.get(agentId);
-      console.log(`[ws] Connected: ${agentId}`);
-
+      const agent = agents.get(ws.data.params.agentId);
       if (agent?.fileWatcher) {
-        const listener = (evt: any) => {
-          ws.send(JSON.stringify({ type: "file_change", ...evt }));
-        };
+        const listener = (evt: any) => ws.send(JSON.stringify({ type: "file_change", ...evt }));
         agent.fileWatcher.addListener(listener);
         (ws as any)._fwl = listener;
       }
@@ -124,7 +104,6 @@ export function setupChatWebSocket(app: any) {
         ws.send(JSON.stringify({ type: "error", message: `Agent is ${agent.status}. Wait for it to be ready.` }));
         return;
       }
-
       try {
         await agent.openclawClient.sendMessage(body.content, "agent:main:main", {
           onTextDelta: (text) => ws.send(JSON.stringify({ type: "chunk", content: text })),
