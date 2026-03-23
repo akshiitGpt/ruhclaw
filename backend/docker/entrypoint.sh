@@ -11,4 +11,4 @@ PROXY_PORT=18790 node /ws-proxy.mjs &
 
 # Start gateway
 export NODE_OPTIONS="--max-old-space-size=2048"
-exec openclaw gateway run --force --port 18789
+exec openclaw gateway run --force --port 18789 --token ruhclaw-local

@@ -43,15 +43,19 @@ export async function createContainer(): Promise<ContainerInfo> {
   const gatewayUrl = `http://localhost:${hostPort}`;
   console.log(`[docker] Container started: ${containerId.slice(0, 12)}`);
 
-  // Poll every 1s instead of 2s — gateway config is pre-baked so startup is faster
-  const maxRetries = 40;
+  // Gateway takes ~30-35s to start (Node.js loading 540 packages)
+  // Poll via docker exec to check if port 18789 is listening inside container
+  const maxRetries = 60;
   for (let i = 0; i < maxRetries; i++) {
     await new Promise((r) => setTimeout(r, 1000));
-    try {
-      const res = await fetch(gatewayUrl, { signal: AbortSignal.timeout(1500) });
+
+    // Check if gateway is reachable inside the container (any HTTP response = it's up)
+    const check = await $`docker exec ${containerId} curl -so /dev/null -w '%{http_code}' http://127.0.0.1:18789/ 2>/dev/null`.quiet().nothrow();
+    const code = check.text().trim();
+    if (code && code !== "000") {
       console.log(`[docker] Gateway ready at ${gatewayUrl} (${i + 1}s)`);
       return { containerId, gatewayUrl, hostPort, fileWatcherPort, previewPort };
-    } catch {}
+    }
 
     if (i % 10 === 9) {
       const status = await $`docker inspect -f '{{.State.Running}}' ${containerId} 2>/dev/null`.quiet().nothrow();

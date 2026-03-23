@@ -37,7 +37,8 @@
     "port": 18789,
     "bind": "loopback",
     "auth": {
-      "mode": "none"
+      "mode": "token",
+      "token": "ruhclaw-local"
     },
     "controlUi": {
       "enabled": false
@@ -54,5 +55,8 @@
   },
   "tools": {
     "profile": "coding"
+  },
+  "browser": {
+    "enabled": false
   }
 }
