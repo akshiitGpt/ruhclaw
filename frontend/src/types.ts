@@ -3,6 +3,7 @@ export interface Agent {
   name: string;
   status: "creating" | "running" | "stopped" | "error";
   gatewayUrl?: string;
+  previewPort?: number;
   createdAt: string;
 }
 

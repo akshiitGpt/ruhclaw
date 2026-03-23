@@ -92,6 +92,9 @@ echo "[entrypoint] Starting OpenClaw gateway on port ${PORT}..."
 # Start file watcher sidecar
 WORKSPACE_DIR="${WORKSPACE}" node /file-watcher.mjs &
 
+# Start preview reverse proxy (forwards 0.0.0.0:18792 → 127.0.0.1:<app-port>)
+PREVIEW_PORT=18792 node /preview-proxy.mjs &
+
 # Run gateway on loopback + WS proxy on lan
 export NODE_OPTIONS="--max-old-space-size=2048"
 

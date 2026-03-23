@@ -18,6 +18,7 @@ export default function Chat() {
   const [explorerOpen, setExplorerOpen] = useState(false);
   const [explorerW, setExplorerW] = useState(440);
   const [creating, setCreating] = useState(false);
+  const [previewPort, setPreviewPort] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const rawRef = useRef<((d: WSIncoming) => void) | null>(null);
@@ -26,7 +27,15 @@ export default function Chat() {
   const fe = useFileExplorer(agentId, agentStatus);
 
   useEffect(() => { rawRef.current = (d) => { fe.handleFileEvent(d); fe.handleToolEvent(d); }; }, [fe.handleFileEvent, fe.handleToolEvent]);
-  useEffect(() => { if (agentStatus === "running" && agentId) setExplorerOpen(true); }, [agentStatus, agentId]);
+  useEffect(() => {
+    if (agentStatus === "running" && agentId) {
+      setExplorerOpen(true);
+      // Fetch preview port from agent record
+      import("@/lib/api").then(({ getAgent }) =>
+        getAgent(agentId).then((a) => { if (a.previewPort) setPreviewPort(a.previewPort); })
+      ).catch(() => {});
+    }
+  }, [agentStatus, agentId]);
   useEffect(() => { listAgents().then(setAgents).catch(() => {}); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
 
@@ -130,7 +139,7 @@ export default function Chat() {
       {explorerOpen && ready && <div className="resize-handle" onMouseDown={startResize} />}
       {explorerOpen && ready && (
         <div style={{ width: explorerW }} className="shrink-0 overflow-hidden">
-          <FileExplorer tree={fe.tree} selectedPath={fe.selectedPath} fileContent={fe.fileContent} loading={fe.loading} onSelectFile={fe.selectFile} onRefresh={fe.refreshTree} onClose={() => setExplorerOpen(false)} />
+          <FileExplorer tree={fe.tree} selectedPath={fe.selectedPath} fileContent={fe.fileContent} loading={fe.loading} onSelectFile={fe.selectFile} onRefresh={fe.refreshTree} onClose={() => setExplorerOpen(false)} agentId={agentId || ""} previewPort={previewPort} />
         </div>
       )}
     </div>

@@ -39,3 +39,11 @@ export async function getFileContent(agentId: string, path: string): Promise<str
   const data = await res.json();
   return data.content ?? "";
 }
+
+export async function setPreviewTarget(agentId: string, port: number): Promise<void> {
+  await fetch(`${BASE}/agents/${agentId}/preview-target`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ port }),
+  });
+}

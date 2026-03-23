@@ -1,8 +1,9 @@
 import { $ } from "bun";
 
 const IMAGE_NAME = "ruhclaw-openclaw";
-const GATEWAY_PORT = 18790; // proxy port
-const WATCHER_PORT = 18791; // file watcher port
+const GATEWAY_PORT = 18790;
+const WATCHER_PORT = 18791;
+const PREVIEW_PORT = 18792;
 
 let nextPort = 19000;
 
@@ -12,6 +13,7 @@ export interface ContainerInfo {
   gatewayToken: string;
   hostPort: number;
   fileWatcherPort: number;
+  previewPort: number;
 }
 
 export async function ensureImage(): Promise<void> {
@@ -30,29 +32,29 @@ export async function createContainer(): Promise<ContainerInfo> {
 
   const hostPort = nextPort;
   const fileWatcherPort = nextPort + 1;
-  nextPort += 2; // allocate in pairs
+  const previewPort = nextPort + 2;
+  nextPort += 3;
 
   const token = crypto.randomUUID();
   const openrouterKey = process.env.OPENROUTER_API_KEY || "";
 
-  console.log(`[docker] Creating container (gateway:${hostPort}, watcher:${fileWatcherPort})...`);
+  console.log(`[docker] Creating container (gw:${hostPort}, watch:${fileWatcherPort}, preview:${previewPort})...`);
 
   const result =
-    await $`docker run -dt --name ruhclaw-agent-${hostPort} -p ${hostPort}:${GATEWAY_PORT} -p ${fileWatcherPort}:${WATCHER_PORT} -e OPENCLAW_GATEWAY_TOKEN=${token} -e OPENROUTER_API_KEY=${openrouterKey} -e OPENCLAW_MODEL=${process.env.OPENCLAW_MODEL || "anthropic/claude-sonnet-4"} --memory=2g --cpus=1 ${IMAGE_NAME}`.quiet();
+    await $`docker run -dt --name ruhclaw-agent-${hostPort} -p ${hostPort}:${GATEWAY_PORT} -p ${fileWatcherPort}:${WATCHER_PORT} -p ${previewPort}:${PREVIEW_PORT} -e OPENCLAW_GATEWAY_TOKEN=${token} -e OPENROUTER_API_KEY=${openrouterKey} -e OPENCLAW_MODEL=${process.env.OPENCLAW_MODEL || "anthropic/claude-sonnet-4"} --memory=2g --cpus=1 ${IMAGE_NAME}`.quiet();
 
   const containerId = result.text().trim();
   const gatewayUrl = `http://localhost:${hostPort}`;
 
   console.log(`[docker] Container started: ${containerId.slice(0, 12)}`);
 
-  // Wait for gateway
   const maxRetries = 30;
   for (let i = 0; i < maxRetries; i++) {
     await new Promise((r) => setTimeout(r, 2000));
     try {
       const res = await fetch(gatewayUrl, { signal: AbortSignal.timeout(2000) });
       console.log(`[docker] Gateway ready at ${gatewayUrl} (check ${i + 1})`);
-      return { containerId, gatewayUrl, gatewayToken: token, hostPort, fileWatcherPort };
+      return { containerId, gatewayUrl, gatewayToken: token, hostPort, fileWatcherPort, previewPort };
     } catch {}
 
     if (i % 5 === 4) {
